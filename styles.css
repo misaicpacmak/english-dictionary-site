@@ -372,6 +372,11 @@ select:focus {
   margin-top: 16px;
 }
 
+.word-action-buttons {
+  display: inline-flex;
+  gap: 8px;
+}
+
 .frequency {
   color: var(--muted);
   font-size: 0.9rem;
@@ -391,6 +396,18 @@ select:focus {
   color: white;
   border-color: var(--green);
   background: var(--green);
+}
+
+.learn-toggle.delete-word,
+.danger-button {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.25);
+  background: #fff5f5;
+}
+
+.learn-toggle.delete-word:hover,
+.danger-button:hover {
+  background: #fee2e2;
 }
 
 .card-controls {

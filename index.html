@@ -62,20 +62,8 @@
           Перевод / смысл
           <input id="newMeaning" name="meaning" type="text" placeholder="поддерживать; сохранять" required>
         </label>
-        <label>
-          Приоритет
-          <select id="newPriority" name="priority">
-            <option value="1">1 - самое важное</option>
-            <option value="2">2 - повторялось</option>
-            <option value="3" selected>3 - обычное</option>
-          </select>
-        </label>
-        <label>
-          Частота записи
-          <input id="newFrequency" name="frequency" type="number" min="1" max="99" value="1">
-        </label>
         <label class="wide-field">
-          Пример / заметка
+          Комментарий
           <input id="newNote" name="note" type="text" placeholder="необязательно">
         </label>
         <div class="form-actions">
@@ -121,6 +109,7 @@
         <div class="study-actions">
           <button class="secondary-button" type="button" id="againButton">Еще раз</button>
           <button class="secondary-button" type="button" id="editCardButton">Редактировать карточку</button>
+          <button class="secondary-button danger-button" type="button" id="deleteCardButton">Удалить карточку</button>
           <button class="primary-button" type="button" id="learnedButton">Отметить выученным</button>
         </div>
         <p class="progress-text" id="cardProgress">0 / 0</p>

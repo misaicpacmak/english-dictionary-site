@@ -2188,6 +2188,7 @@ const WORDS = [
 const STORAGE_KEY = "englishWordsLearned:v1";
 const CUSTOM_WORDS_KEY = "englishWordsCustom:v1";
 const EDITED_WORDS_KEY = "englishWordsEdited:v1";
+const DELETED_WORDS_KEY = "englishWordsDeleted:v1";
 
 function readStorage(key, fallback) {
   try {
@@ -2226,9 +2227,15 @@ function loadEditedWords() {
   return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
 }
 
+function loadDeletedWords() {
+  const saved = readStorage(DELETED_WORDS_KEY, []);
+  return Array.isArray(saved) ? saved : [];
+}
+
 let learned = new Set(loadLearned());
 let customWords = loadCustomWords();
 let editedWords = loadEditedWords();
+let deletedWords = new Set(loadDeletedWords());
 let allWords = buildWords();
 let cardWords = [...allWords];
 let cardIndex = 0;
@@ -2263,6 +2270,7 @@ const formTitle = byId("formTitle");
 const formDescription = byId("formDescription");
 const saveWordButton = byId("saveWordButton");
 const editCardButton = byId("editCardButton");
+const deleteCardButton = byId("deleteCardButton");
 
 function saveLearned() {
   writeStorage(STORAGE_KEY, [...learned]);
@@ -2276,6 +2284,10 @@ function saveEditedWords() {
   writeStorage(EDITED_WORDS_KEY, editedWords);
 }
 
+function saveDeletedWords() {
+  writeStorage(DELETED_WORDS_KEY, [...deletedWords]);
+}
+
 function buildWords() {
   const baseWords = WORDS.map((item) => {
     const baseKey = item.word;
@@ -2285,9 +2297,11 @@ function buildWords() {
       source: "base",
       baseKey,
     };
-  });
+  }).filter((item) => !deletedWords.has(item.baseKey));
 
-  return [...baseWords, ...customWords].sort((a, b) => {
+  const aliveCustomWords = customWords.filter((item) => !deletedWords.has(wordKey(item)));
+
+  return [...baseWords, ...aliveCustomWords].sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return a.word.localeCompare(b.word, "en", { sensitivity: "base" });
   });
@@ -2349,9 +2363,12 @@ function renderList() {
         <p class="note">${item.note ? escapeHTML(item.note) : "&nbsp;"}</p>
         <div class="word-actions">
           <span class="frequency">Частота: ${item.frequency}</span>
-          <button class="learn-toggle ${isLearned ? "active" : ""}" data-word="${escapeHTML(key)}">
-            ${isLearned ? "Выучено" : "Отметить"}
-          </button>
+          <div class="word-action-buttons">
+            <button class="learn-toggle ${isLearned ? "active" : ""}" data-word="${escapeHTML(key)}">
+              ${isLearned ? "Выучено" : "Отметить"}
+            </button>
+            <button class="learn-toggle delete-word" data-word="${escapeHTML(key)}">Удалить</button>
+          </div>
         </div>
       </article>
     `;
@@ -2421,6 +2438,12 @@ function normalizeWord(value) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function getPriorityByFrequency(frequency) {
+  if (frequency >= 3) return 1;
+  if (frequency === 2) return 2;
+  return 3;
+}
+
 function refreshAfterWordChange(message) {
   allWords = buildWords();
   formMessage.textContent = message;
@@ -2432,8 +2455,6 @@ function refreshAfterWordChange(message) {
 function resetWordForm() {
   editingTarget = null;
   addWordForm.reset();
-  byId("newPriority").value = "3";
-  byId("newFrequency").value = "1";
   formEyebrow.textContent = "Новое слово";
   formTitle.textContent = "Добавить в словарь";
   formDescription.textContent = "Слово сразу появится в списке и карточках. Оно сохранится в этом браузере.";
@@ -2445,8 +2466,6 @@ function addCustomWord(event) {
   event.preventDefault();
   const word = normalizeWord(byId("newWord").value);
   const meaning = byId("newMeaning").value.trim();
-  const priority = Number(byId("newPriority").value);
-  const frequency = Math.max(1, Number(byId("newFrequency").value) || 1);
   const note = byId("newNote").value.trim();
 
   if (!word || !meaning) {
@@ -2454,24 +2473,34 @@ function addCustomWord(event) {
     return;
   }
 
-  const duplicate = allWords.some((item) => {
-    const sameWord = item.word.toLowerCase() === word.toLowerCase();
-    const sameItem = editingTarget && wordKey(item) === editingTarget.key;
-    return sameWord && !sameItem;
-  });
-  if (duplicate) {
-    formMessage.textContent = "Такое слово уже есть в словаре.";
-    return;
-  }
-
   if (editingTarget) {
+    const duplicate = allWords.some((item) => {
+      const sameWord = item.word.toLowerCase() === word.toLowerCase();
+      const sameItem = wordKey(item) === editingTarget.key;
+      return sameWord && !sameItem;
+    });
+    if (duplicate) {
+      formMessage.textContent = "Такое слово уже есть в словаре.";
+      return;
+    }
+
     if (editingTarget.source === "base") {
+      const current = allWords.find((item) => wordKey(item) === editingTarget.key);
+      const frequency = Math.max(1, current?.frequency || 1);
+      const priority = getPriorityByFrequency(frequency);
       editedWords[editingTarget.baseKey] = { priority, word, meaning, frequency, note };
       saveEditedWords();
     } else {
       customWords = customWords.map((item) => (
         wordKey(item) === editingTarget.key
-          ? { ...item, priority, word, meaning, frequency, note }
+          ? {
+            ...item,
+            word,
+            meaning,
+            note,
+            frequency: Math.max(1, item.frequency || 1),
+            priority: getPriorityByFrequency(Math.max(1, item.frequency || 1)),
+          }
           : item
       ));
       saveCustomWords();
@@ -2481,13 +2510,45 @@ function addCustomWord(event) {
     return;
   }
 
+  const duplicateWord = allWords.find((item) => item.word.toLowerCase() === word.toLowerCase());
+  if (duplicateWord) {
+    if (duplicateWord.source === "base") {
+      const nextFrequency = Math.max(1, Number(duplicateWord.frequency) || 1) + 1;
+      const nextPriority = getPriorityByFrequency(nextFrequency);
+      editedWords[duplicateWord.baseKey] = {
+        priority: nextPriority,
+        frequency: nextFrequency,
+        word: duplicateWord.word,
+        meaning,
+        note,
+      };
+      saveEditedWords();
+    } else {
+      customWords = customWords.map((item) => {
+        if (wordKey(item) !== wordKey(duplicateWord)) return item;
+        const nextFrequency = Math.max(1, Number(item.frequency) || 1) + 1;
+        return {
+          ...item,
+          meaning,
+          note,
+          frequency: nextFrequency,
+          priority: getPriorityByFrequency(nextFrequency),
+        };
+      });
+      saveCustomWords();
+    }
+    resetWordForm();
+    refreshAfterWordChange("Слово уже было в словаре: частота увеличена, приоритет пересчитан автоматически.");
+    return;
+  }
+
   customWords.push({
     id: `custom:${Date.now()}:${word}`,
     source: "custom",
-    priority,
+    priority: 3,
     word,
     meaning,
-    frequency,
+    frequency: 1,
     note,
   });
   saveCustomWords();
@@ -2517,16 +2578,36 @@ function editCurrentCard() {
   toggleAddForm.textContent = "Закрыть добавление";
   formEyebrow.textContent = "Редактирование";
   formTitle.textContent = "Редактировать карточку";
-  formDescription.textContent = "Измени слово, перевод, приоритет или заметку. Правка сохранится в этом браузере.";
+  formDescription.textContent = "Измени слово, перевод и комментарий. Приоритет рассчитывается автоматически от частоты.";
   saveWordButton.textContent = "Сохранить изменения";
   formMessage.textContent = "";
   byId("newWord").value = item.word;
   byId("newMeaning").value = item.meaning;
-  byId("newPriority").value = String(item.priority);
-  byId("newFrequency").value = String(item.frequency);
   byId("newNote").value = item.note || "";
   addWordPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   byId("newWord").focus();
+}
+
+function deleteWordByKey(key) {
+  const item = allWords.find((entry) => wordKey(entry) === key);
+  if (!item) return;
+
+  const confirmed = window.confirm(`Удалить слово "${item.word}" из словаря?`);
+  if (!confirmed) return;
+
+  if (item.source === "base") {
+    deletedWords.add(item.baseKey);
+    delete editedWords[item.baseKey];
+    saveEditedWords();
+    saveDeletedWords();
+  } else {
+    customWords = customWords.filter((entry) => wordKey(entry) !== key);
+    saveCustomWords();
+  }
+
+  learned.delete(key);
+  saveLearned();
+  refreshAfterWordChange(`Слово "${item.word}" удалено.`);
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -2539,6 +2620,11 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 });
 
 wordGrid.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest(".delete-word");
+  if (deleteButton) {
+    deleteWordByKey(deleteButton.dataset.word);
+    return;
+  }
   const button = event.target.closest(".learn-toggle");
   if (button) toggleLearned(button.dataset.word);
 });
@@ -2547,6 +2633,10 @@ toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
 cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
 addWordForm.addEventListener("submit", addCustomWord);
 editCardButton.addEventListener("click", editCurrentCard);
+deleteCardButton.addEventListener("click", () => {
+  if (!cardWords.length) return;
+  deleteWordByKey(wordKey(cardWords[cardIndex]));
+});
 
 searchInput.addEventListener("input", renderList);
 listPriorityFilter.addEventListener("change", renderList);
