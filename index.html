@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Английские слова</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Словарь для повторения</p>
+        <h1>Английские слова</h1>
+        <p class="hero-text">Все слова из конспекта собраны в удобный список. Приоритет зависит от того, как часто слово встречалось в записях.</p>
+      </div>
+      <div class="hero-card" aria-label="Статистика">
+        <span class="hero-number" id="totalCount">0</span>
+        <span class="hero-label">слов и выражений</span>
+      </div>
+    </header>
+
+    <section class="stats" aria-label="Быстрая статистика">
+      <article class="stat-card priority-one">
+        <span id="priorityOneCount">0</span>
+        <p>Приоритет 1</p>
+      </article>
+      <article class="stat-card priority-two">
+        <span id="priorityTwoCount">0</span>
+        <p>Приоритет 2</p>
+      </article>
+      <article class="stat-card priority-three">
+        <span id="priorityThreeCount">0</span>
+        <p>Приоритет 3</p>
+      </article>
+      <article class="stat-card learned-card">
+        <span id="learnedCount">0</span>
+        <p>Отмечено выученными</p>
+      </article>
+    </section>
+
+    <div class="top-actions">
+      <nav class="tabs" aria-label="Режимы">
+        <button class="tab-button active" type="button" data-view="cards">Карточки</button>
+        <button class="tab-button" type="button" data-view="list">Список слов</button>
+      </nav>
+      <button class="primary-button add-word-toggle" type="button" id="toggleAddForm">+ Добавить слово</button>
+    </div>
+
+    <section class="add-word-panel" id="addWordPanel" hidden>
+      <div>
+        <p class="eyebrow" id="formEyebrow">Новое слово</p>
+        <h2 id="formTitle">Добавить в словарь</h2>
+        <p id="formDescription">Слово сразу появится в списке и карточках. Оно сохранится в этом браузере.</p>
+      </div>
+      <form class="add-word-form" id="addWordForm">
+        <label>
+          Слово / выражение
+          <input id="newWord" name="word" type="text" placeholder="например: maintain" required>
+        </label>
+        <label>
+          Перевод / смысл
+          <input id="newMeaning" name="meaning" type="text" placeholder="поддерживать; сохранять" required>
+        </label>
+        <label>
+          Приоритет
+          <select id="newPriority" name="priority">
+            <option value="1">1 - самое важное</option>
+            <option value="2">2 - повторялось</option>
+            <option value="3" selected>3 - обычное</option>
+          </select>
+        </label>
+        <label>
+          Частота записи
+          <input id="newFrequency" name="frequency" type="number" min="1" max="99" value="1">
+        </label>
+        <label class="wide-field">
+          Пример / заметка
+          <input id="newNote" name="note" type="text" placeholder="необязательно">
+        </label>
+        <div class="form-actions">
+          <button class="primary-button" type="submit" id="saveWordButton">Сохранить слово</button>
+          <button class="secondary-button" type="button" id="cancelAddWord">Закрыть</button>
+        </div>
+        <p class="form-message" id="formMessage" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <main>
+      <section class="panel active" id="cardsView">
+        <div class="controls card-controls">
+          <label>
+            Приоритет
+            <select id="cardPriorityFilter">
+              <option value="all">Все</option>
+              <option value="1">1 - самые важные</option>
+              <option value="2">2 - повторялись</option>
+              <option value="3">3 - остальные</option>
+            </select>
+          </label>
+          <button class="ghost-button" type="button" id="shuffleButton">Перемешать</button>
+        </div>
+
+        <div class="flashcard-wrap">
+          <button class="nav-button" type="button" id="prevCard" aria-label="Предыдущая карточка">‹</button>
+          <article class="flashcard" id="flashcard" tabindex="0" aria-live="polite">
+            <div class="flashcard-side flashcard-front">
+              <p class="mini-label" id="cardMeta">Приоритет</p>
+              <h2 id="cardWord">word</h2>
+              <p class="hint">Нажми на карточку, чтобы увидеть перевод</p>
+            </div>
+            <div class="flashcard-side flashcard-back">
+              <p class="mini-label">Перевод</p>
+              <h2 id="cardMeaning">meaning</h2>
+              <p id="cardNote"></p>
+            </div>
+          </article>
+          <button class="nav-button" type="button" id="nextCard" aria-label="Следующая карточка">›</button>
+        </div>
+
+        <div class="study-actions">
+          <button class="secondary-button" type="button" id="againButton">Еще раз</button>
+          <button class="secondary-button" type="button" id="editCardButton">Редактировать карточку</button>
+          <button class="primary-button" type="button" id="learnedButton">Отметить выученным</button>
+        </div>
+        <p class="progress-text" id="cardProgress">0 / 0</p>
+      </section>
+
+      <section class="panel" id="listView">
+        <div class="controls">
+          <label class="search-label">
+            Поиск
+            <input id="searchInput" type="search" placeholder="Например: suggest, поддерживать">
+          </label>
+          <label>
+            Приоритет
+            <select id="listPriorityFilter">
+              <option value="all">Все</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </label>
+          <label class="checkbox-label">
+            <input id="hideLearned" type="checkbox">
+            Скрыть выученные
+          </label>
+        </div>
+        <div class="word-grid" id="wordGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
