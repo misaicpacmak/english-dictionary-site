@@ -2253,6 +2253,7 @@ const searchInput = byId("searchInput");
 const listPriorityFilter = byId("listPriorityFilter");
 const cardPriorityFilter = byId("cardPriorityFilter");
 const hideLearned = byId("hideLearned");
+const groupButtons = byId("groupButtons");
 const flashcard = byId("flashcard");
 const cardMeta = byId("cardMeta");
 const cardWord = byId("cardWord");
@@ -2280,6 +2281,67 @@ const undoToastTimer = byId("undoToastTimer");
 let undoTimeoutId = null;
 let undoAction = null;
 
+const GROUP_DEFS = [
+  {
+    id: "animals",
+    label: "Животные",
+    matchers: [
+      /\b(animal|animals|bird|birds|beak|claw|lizard|insect|insects|brood|offspring|winged|scatter|nest|predator|prey|species)\b/i,
+      /(животн|птиц|насеком|ящериц|клюв|когот|выводок|потомств|крылат)/i,
+    ],
+  },
+  {
+    id: "travel",
+    label: "Путешествия",
+    matchers: [
+      /\b(trip|travel|journey|tourist|tourism|flight|airport|hotel|passport|visa|route|map|luggage|baggage)\b/i,
+      /(путешеств|турист|отпуск|рейс|аэропорт|отель|виза|паспорт|маршрут|багаж)/i,
+    ],
+  },
+  {
+    id: "food",
+    label: "Еда",
+    matchers: [
+      /\b(food|meal|eat|drink|restaurant|cafe|coffee|tea|bread|cheese|wine|honey|fruit|vegetable|cook|recipe)\b/i,
+      /(еда|пищ|кухн|ресторан|кафе|кофе|чай|хлеб|сыр|вино|мёд|мед|фрукт|овощ|готовить|рецепт)/i,
+    ],
+  },
+  {
+    id: "nature",
+    label: "Природа",
+    matchers: [
+      /\b(forest|mountain|river|lake|sea|ocean|climate|weather|rain|snow|wind|soil|earth|environment|ecology|emission|pollution)\b/i,
+      /(лес|гора|река|озеро|море|океан|климат|погод|дожд|снег|ветер|почв|природ|эколог|выброс|загрязн)/i,
+    ],
+  },
+  {
+    id: "science",
+    label: "Наука",
+    matchers: [
+      /\b(science|research|study|experiment|data|analysis|statistics|hypothesis|theory|evidence|proof|measure|estimate|model)\b/i,
+      /(наук|исследован|эксперимент|данн|анализ|статистик|гипотез|теор|доказат|измер|оценк|модел)/i,
+    ],
+  },
+  {
+    id: "business",
+    label: "Бизнес",
+    matchers: [
+      /\b(business|company|market|customer|client|profit|loss|price|cost|budget|contract|deal|proposal|invest|trade)\b/i,
+      /(бизнес|компани|рынок|клиент|прибыл|убыт|цен|стоим|бюджет|контракт|сделк|предложен|инвест|торгов)/i,
+    ],
+  },
+  {
+    id: "emotions",
+    label: "Эмоции",
+    matchers: [
+      /\b(feel|feeling|emotion|happy|sad|angry|fear|anxiety|stress|confidence|pride|admiration)\b/i,
+      /(чувств|эмоци|радост|груст|злост|страх|тревог|стресс|уверен|горд|восхищ)/i,
+    ],
+  },
+];
+
+let selectedGroup = "all";
+
 function saveLearned() {
   writeStorage(STORAGE_KEY, [...learned]);
 }
@@ -2299,20 +2361,39 @@ function saveDeletedWords() {
 function buildWords() {
   const baseWords = WORDS.map((item) => {
     const baseKey = item.word;
-    return {
+    return enrichWord({
       ...item,
       ...(editedWords[baseKey] || {}),
       source: "base",
       baseKey,
-    };
+    });
   }).filter((item) => !deletedWords.has(item.baseKey));
 
-  const aliveCustomWords = customWords.filter((item) => !deletedWords.has(wordKey(item)));
+  const aliveCustomWords = customWords
+    .filter((item) => !deletedWords.has(wordKey(item)))
+    .map((item) => enrichWord({ ...item }));
 
   return [...baseWords, ...aliveCustomWords].sort((a, b) => {
     if (a.priority !== b.priority) return a.priority - b.priority;
     return a.word.localeCompare(b.word, "en", { sensitivity: "base" });
   });
+}
+
+function deriveWordGroups(item) {
+  const haystack = `${item.word} ${item.meaning} ${item.note || ""}`.toLowerCase();
+  const groups = new Set();
+  GROUP_DEFS.forEach((group) => {
+    const hit = group.matchers.some((regex) => regex.test(haystack));
+    if (hit) groups.add(group.id);
+  });
+  return [...groups];
+}
+
+function enrichWord(item) {
+  return {
+    ...item,
+    groups: deriveWordGroups(item),
+  };
 }
 
 function escapeHTML(value) {
@@ -2343,6 +2424,31 @@ function matchesSearch(item, query) {
   return text.includes(query.toLowerCase().trim());
 }
 
+function renderGroupButtons() {
+  if (!groupButtons) return;
+  const counts = new Map();
+  allWords.forEach((item) => {
+    (item.groups || []).forEach((groupId) => {
+      counts.set(groupId, (counts.get(groupId) || 0) + 1);
+    });
+  });
+
+  const chips = [
+    { id: "all", label: "Все", count: allWords.length },
+    ...GROUP_DEFS.map((group) => ({
+      id: group.id,
+      label: group.label,
+      count: counts.get(group.id) || 0,
+    })).filter((group) => group.count > 0),
+  ];
+
+  groupButtons.innerHTML = chips.map((chip) => `
+    <button class="group-chip ${chip.id === selectedGroup ? "active" : ""}" type="button" data-group="${chip.id}">
+      ${escapeHTML(chip.label)} · ${chip.count}
+    </button>
+  `).join("");
+}
+
 function renderList() {
   const query = searchInput.value;
   const priority = listPriorityFilter.value;
@@ -2350,7 +2456,8 @@ function renderList() {
     const priorityOk = priority === "all" || String(item.priority) === priority;
     const searchOk = !query || matchesSearch(item, query);
     const learnedOk = !hideLearned.checked || !learned.has(wordKey(item));
-    return priorityOk && searchOk && learnedOk;
+    const groupOk = selectedGroup === "all" || (item.groups || []).includes(selectedGroup);
+    return priorityOk && searchOk && learnedOk && groupOk;
   });
 
   if (!filtered.length) {
@@ -2361,6 +2468,10 @@ function renderList() {
   wordGrid.innerHTML = filtered.map((item) => {
     const key = wordKey(item);
     const isLearned = learned.has(key);
+    const groupPills = (item.groups || []).map((groupId) => {
+      const meta = GROUP_DEFS.find((group) => group.id === groupId);
+      return `<span class="word-group-pill">${escapeHTML(meta ? meta.label : groupId)}</span>`;
+    }).join("");
     return `
       <article class="word-card ${isLearned ? "learned" : ""}">
         <div class="word-topline">
@@ -2369,6 +2480,7 @@ function renderList() {
         </div>
         <p class="meaning">${escapeHTML(item.meaning)}</p>
         <p class="note">${item.note ? escapeHTML(item.note) : "&nbsp;"}</p>
+        ${groupPills ? `<div class="word-groups">${groupPills}</div>` : ""}
         <div class="word-actions">
           <span class="frequency">Частота: ${item.frequency}</span>
           <div class="word-action-buttons">
@@ -2456,6 +2568,7 @@ function refreshAfterWordChange(message) {
   allWords = buildWords();
   formMessage.textContent = message;
   updateStats();
+  renderGroupButtons();
   renderList();
   filterCardWords();
 }
@@ -2688,6 +2801,16 @@ wordGrid.addEventListener("click", (event) => {
   if (button) toggleLearned(button.dataset.word);
 });
 
+if (groupButtons) {
+  groupButtons.addEventListener("click", (event) => {
+    const chip = event.target.closest(".group-chip");
+    if (!chip) return;
+    selectedGroup = chip.dataset.group || "all";
+    renderGroupButtons();
+    renderList();
+  });
+}
+
 if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
 if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
 if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
@@ -2736,5 +2859,6 @@ document.addEventListener("keydown", (event) => {
 });
 
 updateStats();
+renderGroupButtons();
 renderList();
 filterCardWords();
