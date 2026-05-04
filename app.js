@@ -2412,11 +2412,11 @@ function wordKey(item) {
 }
 
 function updateStats() {
-  totalCount.textContent = allWords.length;
-  priorityOneCount.textContent = allWords.filter((item) => item.priority === 1).length;
-  priorityTwoCount.textContent = allWords.filter((item) => item.priority === 2).length;
-  priorityThreeCount.textContent = allWords.filter((item) => item.priority === 3).length;
-  learnedCount.textContent = learned.size;
+  if (totalCount) totalCount.textContent = allWords.length;
+  if (priorityOneCount) priorityOneCount.textContent = allWords.filter((item) => item.priority === 1).length;
+  if (priorityTwoCount) priorityTwoCount.textContent = allWords.filter((item) => item.priority === 2).length;
+  if (priorityThreeCount) priorityThreeCount.textContent = allWords.filter((item) => item.priority === 3).length;
+  if (learnedCount) learnedCount.textContent = learned.size;
 }
 
 function matchesSearch(item, query) {
@@ -2450,12 +2450,13 @@ function renderGroupButtons() {
 }
 
 function renderList() {
-  const query = searchInput.value;
-  const priority = listPriorityFilter.value;
+  if (!wordGrid) return;
+  const query = searchInput ? searchInput.value : "";
+  const priority = listPriorityFilter ? listPriorityFilter.value : "all";
   const filtered = allWords.filter((item) => {
     const priorityOk = priority === "all" || String(item.priority) === priority;
     const searchOk = !query || matchesSearch(item, query);
-    const learnedOk = !hideLearned.checked || !learned.has(wordKey(item));
+    const learnedOk = !hideLearned || !hideLearned.checked || !learned.has(wordKey(item));
     const groupOk = selectedGroup === "all" || (item.groups || []).includes(selectedGroup);
     return priorityOk && searchOk && learnedOk && groupOk;
   });
@@ -2496,7 +2497,7 @@ function renderList() {
 }
 
 function filterCardWords() {
-  const priority = cardPriorityFilter.value;
+  const priority = cardPriorityFilter ? cardPriorityFilter.value : "all";
   cardWords = allWords.filter((item) => priority === "all" || String(item.priority) === priority);
   cardIndex = 0;
   isFlipped = false;
@@ -2504,6 +2505,7 @@ function filterCardWords() {
 }
 
 function renderCard() {
+  if (!flashcard) return;
   flashcard.classList.toggle("flipped", isFlipped);
   if (!cardWords.length) {
     cardMeta.textContent = "Нет слов";
@@ -2603,19 +2605,27 @@ function showUndoToast(message, action) {
 
 function resetWordForm() {
   editingTarget = null;
-  addWordForm.reset();
-  formEyebrow.textContent = "Новое слово";
-  formTitle.textContent = "Добавить в словарь";
-  formDescription.textContent = "Слово сразу появится в списке и карточках. Оно сохранится в этом браузере.";
-  saveWordButton.textContent = "Сохранить слово";
-  formMessage.textContent = "";
+  if (addWordForm) addWordForm.reset();
+  if (formEyebrow) formEyebrow.textContent = "Новое слово";
+  if (formTitle) formTitle.textContent = "Добавить в словарь";
+  if (formDescription) {
+    formDescription.textContent = "Слово сразу появится в списке и карточках. Оно сохранится в этом браузере.";
+  }
+  if (saveWordButton) saveWordButton.textContent = "Сохранить слово";
+  if (formMessage) formMessage.textContent = "";
 }
 
 function addCustomWord(event) {
   event.preventDefault();
-  const word = normalizeWord(byId("newWord").value);
-  const meaning = byId("newMeaning").value.trim();
-  const note = byId("newNote").value.trim();
+  if (!addWordForm || !formMessage) return;
+  const wordInput = byId("newWord");
+  const meaningInput = byId("newMeaning");
+  const noteInput = byId("newNote");
+  if (!wordInput || !meaningInput || !noteInput) return;
+
+  const word = normalizeWord(wordInput.value);
+  const meaning = meaningInput.value.trim();
+  const note = noteInput.value.trim();
 
   if (!word || !meaning) {
     formMessage.textContent = "Заполни слово и перевод.";
@@ -2706,16 +2716,21 @@ function addCustomWord(event) {
 }
 
 function toggleAddWordPanel(forceOpen) {
+  if (!addWordPanel || !toggleAddForm) return;
   const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : addWordPanel.hidden;
   if (shouldOpen && addWordPanel.hidden) resetWordForm();
   addWordPanel.hidden = !shouldOpen;
   toggleAddForm.textContent = shouldOpen ? "Закрыть добавление" : "+ Добавить слово";
   if (!shouldOpen) resetWordForm();
-  if (shouldOpen) byId("newWord").focus();
+  if (shouldOpen) {
+    const wordInput = byId("newWord");
+    if (wordInput) wordInput.focus();
+  }
 }
 
 function editCurrentCard() {
   if (!cardWords.length) return;
+  if (!addWordPanel || !toggleAddForm) return;
   const item = cardWords[cardIndex];
   editingTarget = {
     key: wordKey(item),
@@ -2787,19 +2802,22 @@ document.querySelectorAll(".tab-button").forEach((button) => {
     document.querySelectorAll(".tab-button").forEach((item) => item.classList.remove("active"));
     document.querySelectorAll(".panel").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
-    byId(`${button.dataset.view}View`).classList.add("active");
+    const target = byId(`${button.dataset.view}View`);
+    if (target) target.classList.add("active");
   });
 });
 
-wordGrid.addEventListener("click", (event) => {
-  const deleteButton = event.target.closest(".delete-word");
-  if (deleteButton) {
-    deleteWordByKey(deleteButton.dataset.word);
-    return;
-  }
-  const button = event.target.closest(".learn-toggle");
-  if (button) toggleLearned(button.dataset.word);
-});
+if (wordGrid) {
+  wordGrid.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest(".delete-word");
+    if (deleteButton) {
+      deleteWordByKey(deleteButton.dataset.word);
+      return;
+    }
+    const button = event.target.closest(".learn-toggle");
+    if (button) toggleLearned(button.dataset.word);
+  });
+}
 
 if (groupButtons) {
   groupButtons.addEventListener("click", (event) => {
@@ -2829,30 +2847,45 @@ if (undoToastButton) {
 }
 if (undoToastClose) undoToastClose.addEventListener("click", closeUndoToast);
 
-searchInput.addEventListener("input", renderList);
-listPriorityFilter.addEventListener("change", renderList);
-hideLearned.addEventListener("change", renderList);
-cardPriorityFilter.addEventListener("change", filterCardWords);
-byId("shuffleButton").addEventListener("click", shuffleCards);
-byId("prevCard").addEventListener("click", () => moveCard(-1));
-byId("nextCard").addEventListener("click", () => moveCard(1));
-byId("againButton").addEventListener("click", () => moveCard(1));
-learnedButton.addEventListener("click", () => {
-  if (!cardWords.length) return;
-  toggleLearned(wordKey(cardWords[cardIndex]));
-  moveCard(1);
-});
-flashcard.addEventListener("click", () => {
-  isFlipped = !isFlipped;
-  renderCard();
-});
-flashcard.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
+if (searchInput) searchInput.addEventListener("input", renderList);
+if (listPriorityFilter) listPriorityFilter.addEventListener("change", renderList);
+if (hideLearned) hideLearned.addEventListener("change", renderList);
+if (cardPriorityFilter) cardPriorityFilter.addEventListener("change", filterCardWords);
+
+const shuffleButton = byId("shuffleButton");
+if (shuffleButton) shuffleButton.addEventListener("click", shuffleCards);
+
+const prevCard = byId("prevCard");
+if (prevCard) prevCard.addEventListener("click", () => moveCard(-1));
+
+const nextCard = byId("nextCard");
+if (nextCard) nextCard.addEventListener("click", () => moveCard(1));
+
+const againButton = byId("againButton");
+if (againButton) againButton.addEventListener("click", () => moveCard(1));
+
+if (learnedButton) {
+  learnedButton.addEventListener("click", () => {
+    if (!cardWords.length) return;
+    toggleLearned(wordKey(cardWords[cardIndex]));
+    moveCard(1);
+  });
+}
+
+if (flashcard) {
+  flashcard.addEventListener("click", () => {
     isFlipped = !isFlipped;
     renderCard();
-  }
-});
+  });
+  flashcard.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      isFlipped = !isFlipped;
+      renderCard();
+    }
+  });
+}
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "ArrowLeft") moveCard(-1);
   if (event.key === "ArrowRight") moveCard(1);
