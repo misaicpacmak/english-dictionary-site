@@ -2271,6 +2271,14 @@ const formDescription = byId("formDescription");
 const saveWordButton = byId("saveWordButton");
 const editCardButton = byId("editCardButton");
 const deleteCardButton = byId("deleteCardButton");
+const undoToast = byId("undoToast");
+const undoToastText = byId("undoToastText");
+const undoToastButton = byId("undoToastButton");
+const undoToastClose = byId("undoToastClose");
+const undoToastTimer = byId("undoToastTimer");
+
+let undoTimeoutId = null;
+let undoAction = null;
 
 function saveLearned() {
   writeStorage(STORAGE_KEY, [...learned]);
@@ -2452,6 +2460,34 @@ function refreshAfterWordChange(message) {
   filterCardWords();
 }
 
+function closeUndoToast() {
+  if (!undoToast) return;
+  if (undoTimeoutId) {
+    window.clearTimeout(undoTimeoutId);
+    undoTimeoutId = null;
+  }
+  undoToast.classList.add("closing");
+  window.setTimeout(() => {
+    undoToast.hidden = true;
+    undoToast.classList.remove("closing");
+    undoAction = null;
+  }, 180);
+}
+
+function showUndoToast(message, action) {
+  if (!undoToast || !undoToastText || !undoToastTimer) return;
+  if (undoTimeoutId) window.clearTimeout(undoTimeoutId);
+  undoAction = action;
+  undoToastText.textContent = message;
+  undoToast.hidden = false;
+  undoToast.classList.remove("closing");
+  // restart timer animation
+  undoToastTimer.classList.remove("animate");
+  void undoToastTimer.offsetWidth;
+  undoToastTimer.classList.add("animate");
+  undoTimeoutId = window.setTimeout(() => closeUndoToast(), 5000);
+}
+
 function resetWordForm() {
   editingTarget = null;
   addWordForm.reset();
@@ -2595,6 +2631,10 @@ function deleteWordByKey(key) {
   const confirmed = window.confirm(`Удалить слово "${item.word}" из словаря?`);
   if (!confirmed) return;
 
+  const wasLearned = learned.has(key);
+  const previousEdited = item.source === "base" ? editedWords[item.baseKey] : null;
+  const deletedCustom = item.source === "custom" ? { ...item } : null;
+
   if (item.source === "base") {
     deletedWords.add(item.baseKey);
     delete editedWords[item.baseKey];
@@ -2608,6 +2648,25 @@ function deleteWordByKey(key) {
   learned.delete(key);
   saveLearned();
   refreshAfterWordChange(`Слово "${item.word}" удалено.`);
+  showUndoToast(`"${item.word}" удалено`, () => {
+    if (item.source === "base") {
+      deletedWords.delete(item.baseKey);
+      if (previousEdited) editedWords[item.baseKey] = previousEdited;
+      saveEditedWords();
+      saveDeletedWords();
+    } else if (deletedCustom) {
+      const exists = customWords.some((entry) => wordKey(entry) === wordKey(deletedCustom));
+      if (!exists) {
+        customWords.push(deletedCustom);
+        saveCustomWords();
+      }
+    }
+    if (wasLearned) {
+      learned.add(key);
+      saveLearned();
+    }
+    refreshAfterWordChange(`Удаление "${item.word}" отменено.`);
+  });
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -2629,14 +2688,23 @@ wordGrid.addEventListener("click", (event) => {
   if (button) toggleLearned(button.dataset.word);
 });
 
-toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
-cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
-addWordForm.addEventListener("submit", addCustomWord);
-editCardButton.addEventListener("click", editCurrentCard);
-deleteCardButton.addEventListener("click", () => {
-  if (!cardWords.length) return;
-  deleteWordByKey(wordKey(cardWords[cardIndex]));
-});
+if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
+if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
+if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
+if (editCardButton) editCardButton.addEventListener("click", editCurrentCard);
+if (deleteCardButton) {
+  deleteCardButton.addEventListener("click", () => {
+    if (!cardWords.length) return;
+    deleteWordByKey(wordKey(cardWords[cardIndex]));
+  });
+}
+if (undoToastButton) {
+  undoToastButton.addEventListener("click", () => {
+    if (undoAction) undoAction();
+    closeUndoToast();
+  });
+}
+if (undoToastClose) undoToastClose.addEventListener("click", closeUndoToast);
 
 searchInput.addEventListener("input", renderList);
 listPriorityFilter.addEventListener("change", renderList);

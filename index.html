@@ -140,6 +140,15 @@
     </main>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <div class="toast" id="undoToast" role="status" aria-live="polite" hidden>
+    <p id="undoToastText">Слово удалено.</p>
+    <div class="toast-actions">
+      <button class="secondary-button" type="button" id="undoToastButton">Отменить</button>
+      <button class="ghost-button" type="button" id="undoToastClose">Закрыть</button>
+    </div>
+    <div class="toast-timer" id="undoToastTimer"></div>
+  </div>
+
+  <script src="app.js?v=3"></script>
 </body>
 </html>
