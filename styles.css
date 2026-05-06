@@ -328,10 +328,21 @@ select:focus {
   align-items: start;
 }
 
+.word-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .word-card h3 {
   margin: 0;
   font-size: 1.45rem;
   letter-spacing: -0.03em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .badge {
@@ -398,15 +409,22 @@ select:focus {
   background: var(--green);
 }
 
-.learn-toggle.delete-word,
-.danger-button {
-  color: #b91c1c;
-  border-color: rgba(185, 28, 28, 0.25);
+.icon-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(185, 28, 28, 0.22);
   background: #fff5f5;
+  color: #b91c1c;
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
-.learn-toggle.delete-word:hover,
-.danger-button:hover {
+.icon-close:hover {
   background: #fee2e2;
 }
 
@@ -427,6 +445,13 @@ select:focus {
   min-height: 360px;
   transform-style: preserve-3d;
   transition: transform 0.45s ease;
+}
+
+.flashcard .icon-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
 }
 
 .flashcard.flipped {

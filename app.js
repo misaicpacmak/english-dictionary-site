@@ -2271,7 +2271,7 @@ const formTitle = byId("formTitle");
 const formDescription = byId("formDescription");
 const saveWordButton = byId("saveWordButton");
 const editCardButton = byId("editCardButton");
-const deleteCardButton = byId("deleteCardButton");
+const flashcardDelete = byId("flashcardDelete");
 const undoToast = byId("undoToast");
 const undoToastText = byId("undoToastText");
 const undoToastButton = byId("undoToastButton");
@@ -2476,7 +2476,10 @@ function renderList() {
     return `
       <article class="word-card ${isLearned ? "learned" : ""}">
         <div class="word-topline">
-          <h3>${escapeHTML(item.word)}</h3>
+          <div class="word-title-row">
+            <h3>${escapeHTML(item.word)}</h3>
+            <button class="icon-close card-delete" type="button" data-word="${escapeHTML(key)}" aria-label="Удалить слово">×</button>
+          </div>
           <span class="badge priority-${item.priority}">${item.priority}</span>
         </div>
         <p class="meaning">${escapeHTML(item.meaning)}</p>
@@ -2488,7 +2491,6 @@ function renderList() {
             <button class="learn-toggle ${isLearned ? "active" : ""}" data-word="${escapeHTML(key)}">
               ${isLearned ? "Выучено" : "Отметить"}
             </button>
-            <button class="learn-toggle delete-word" data-word="${escapeHTML(key)}">Удалить</button>
           </div>
         </div>
       </article>
@@ -2507,6 +2509,10 @@ function filterCardWords() {
 function renderCard() {
   if (!flashcard) return;
   flashcard.classList.toggle("flipped", isFlipped);
+  if (flashcardDelete) {
+    flashcardDelete.disabled = !cardWords.length;
+    flashcardDelete.style.opacity = cardWords.length ? "1" : "0.35";
+  }
   if (!cardWords.length) {
     cardMeta.textContent = "Нет слов";
     cardWord.textContent = "Пусто";
@@ -2560,6 +2566,43 @@ function normalizeWord(value) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function splitMeaningParts(text) {
+  return String(text || "")
+    .split(/[,;]+/g)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function mergeMeaningField(existing, incoming) {
+  const parts = [];
+  const seen = new Set();
+
+  splitMeaningParts(existing).forEach((part) => {
+    const key = part.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    parts.push(part);
+  });
+
+  splitMeaningParts(incoming).forEach((part) => {
+    const key = part.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    parts.push(part);
+  });
+
+  return parts.join(", ");
+}
+
+function mergeNoteField(existing, incoming) {
+  const a = String(existing || "").trim();
+  const b = String(incoming || "").trim();
+  if (!b) return a;
+  if (!a) return b;
+  if (a.toLowerCase() === b.toLowerCase()) return a;
+  return `${a}; ${b}`;
+}
+
 function getPriorityByFrequency(frequency) {
   if (frequency >= 3) return 1;
   if (frequency === 2) return 2;
@@ -2568,7 +2611,7 @@ function getPriorityByFrequency(frequency) {
 
 function refreshAfterWordChange(message) {
   allWords = buildWords();
-  formMessage.textContent = message;
+  if (formMessage) formMessage.textContent = message;
   updateStats();
   renderGroupButtons();
   renderList();
@@ -2590,16 +2633,20 @@ function closeUndoToast() {
 }
 
 function showUndoToast(message, action) {
-  if (!undoToast || !undoToastText || !undoToastTimer) return;
+  if (!undoToast || !undoToastText) return;
   if (undoTimeoutId) window.clearTimeout(undoTimeoutId);
   undoAction = action;
   undoToastText.textContent = message;
   undoToast.hidden = false;
   undoToast.classList.remove("closing");
-  // restart timer animation
-  undoToastTimer.classList.remove("animate");
-  void undoToastTimer.offsetWidth;
-  undoToastTimer.classList.add("animate");
+
+  const timerEl = undoToastTimer || undoToast.querySelector("#undoToastTimer") || undoToast.querySelector(".toast-timer");
+  if (timerEl) {
+    timerEl.classList.remove("animate");
+    void timerEl.offsetWidth;
+    timerEl.classList.add("animate");
+  }
+
   undoTimeoutId = window.setTimeout(() => closeUndoToast(), 5000);
 }
 
@@ -2674,12 +2721,14 @@ function addCustomWord(event) {
     if (duplicateWord.source === "base") {
       const nextFrequency = Math.max(1, Number(duplicateWord.frequency) || 1) + 1;
       const nextPriority = getPriorityByFrequency(nextFrequency);
+      const mergedMeaning = mergeMeaningField(duplicateWord.meaning, meaning);
+      const mergedNote = mergeNoteField(duplicateWord.note, note);
       editedWords[duplicateWord.baseKey] = {
         priority: nextPriority,
         frequency: nextFrequency,
         word: duplicateWord.word,
-        meaning,
-        note,
+        meaning: mergedMeaning,
+        note: mergedNote,
       };
       saveEditedWords();
     } else {
@@ -2688,8 +2737,8 @@ function addCustomWord(event) {
         const nextFrequency = Math.max(1, Number(item.frequency) || 1) + 1;
         return {
           ...item,
-          meaning,
-          note,
+          meaning: mergeMeaningField(item.meaning, meaning),
+          note: mergeNoteField(item.note, note),
           frequency: nextFrequency,
           priority: getPriorityByFrequency(nextFrequency),
         };
@@ -2776,7 +2825,8 @@ function deleteWordByKey(key) {
   learned.delete(key);
   saveLearned();
   refreshAfterWordChange(`Слово "${item.word}" удалено.`);
-  showUndoToast(`"${item.word}" удалено`, () => {
+  window.requestAnimationFrame(() => {
+    showUndoToast(`"${item.word}" удалено`, () => {
     if (item.source === "base") {
       deletedWords.delete(item.baseKey);
       if (previousEdited) editedWords[item.baseKey] = previousEdited;
@@ -2794,6 +2844,7 @@ function deleteWordByKey(key) {
       saveLearned();
     }
     refreshAfterWordChange(`Удаление "${item.word}" отменено.`);
+    });
   });
 }
 
@@ -2809,7 +2860,7 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 if (wordGrid) {
   wordGrid.addEventListener("click", (event) => {
-    const deleteButton = event.target.closest(".delete-word");
+    const deleteButton = event.target.closest(".card-delete");
     if (deleteButton) {
       deleteWordByKey(deleteButton.dataset.word);
       return;
@@ -2833,8 +2884,9 @@ if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPa
 if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
 if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
 if (editCardButton) editCardButton.addEventListener("click", editCurrentCard);
-if (deleteCardButton) {
-  deleteCardButton.addEventListener("click", () => {
+if (flashcardDelete) {
+  flashcardDelete.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (!cardWords.length) return;
     deleteWordByKey(wordKey(cardWords[cardIndex]));
   });
@@ -2873,7 +2925,8 @@ if (learnedButton) {
 }
 
 if (flashcard) {
-  flashcard.addEventListener("click", () => {
+  flashcard.addEventListener("click", (event) => {
+    if (event.target.closest(".icon-close")) return;
     isFlipped = !isFlipped;
     renderCard();
   });

@@ -92,6 +92,7 @@
         <div class="flashcard-wrap">
           <button class="nav-button" type="button" id="prevCard" aria-label="Предыдущая карточка">‹</button>
           <article class="flashcard" id="flashcard" tabindex="0" aria-live="polite">
+            <button class="icon-close" type="button" id="flashcardDelete" aria-label="Удалить карточку">×</button>
             <div class="flashcard-side flashcard-front">
               <p class="mini-label" id="cardMeta">Приоритет</p>
               <h2 id="cardWord">word</h2>
@@ -109,7 +110,6 @@
         <div class="study-actions">
           <button class="secondary-button" type="button" id="againButton">Еще раз</button>
           <button class="secondary-button" type="button" id="editCardButton">Редактировать карточку</button>
-          <button class="secondary-button danger-button" type="button" id="deleteCardButton">Удалить карточку</button>
           <button class="primary-button" type="button" id="learnedButton">Отметить выученным</button>
         </div>
         <p class="progress-text" id="cardProgress">0 / 0</p>
@@ -153,6 +153,6 @@
     <div class="toast-timer" id="undoToastTimer"></div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
