@@ -2351,6 +2351,22 @@ const GROUP_DEFS = [
 
 let selectedGroup = "all";
 
+function recoverCorruptedStateIfNeeded() {
+  // If storage got corrupted and hid all base words, restore safe defaults.
+  if (Array.isArray(WORDS) && WORDS.length > 0 && allWords.length === 0) {
+    customWords = [];
+    editedWords = {};
+    deletedWords = new Set();
+    learned = new Set();
+    saveCustomWords();
+    saveEditedWords();
+    saveDeletedWords();
+    saveLearned();
+    allWords = buildWords();
+    cardWords = [...allWords];
+  }
+}
+
 function saveLearned() {
   writeStorage(STORAGE_KEY, [...learned]);
 }
@@ -2893,6 +2909,13 @@ function showFatalBanner(error) {
   });
 }
 
+function bindEmergencyControls() {
+  if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
+  if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
+  if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
+  if (editCardButton) editCardButton.addEventListener("click", editCurrentCard);
+}
+
 function initApp() {
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2994,11 +3017,9 @@ function initApp() {
 }
 
 try {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initApp);
-  } else {
-    initApp();
-  }
+  recoverCorruptedStateIfNeeded();
+  initApp();
 } catch (error) {
+  bindEmergencyControls();
   showFatalBanner(error);
 }
