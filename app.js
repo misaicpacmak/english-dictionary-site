@@ -2848,103 +2848,147 @@ function deleteWordByKey(key) {
   });
 }
 
-document.querySelectorAll(".tab-button").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".tab-button").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    const target = byId(`${button.dataset.view}View`);
-    if (target) target.classList.add("active");
-  });
-});
-
-if (wordGrid) {
-  wordGrid.addEventListener("click", (event) => {
-    const deleteButton = event.target.closest(".card-delete");
-    if (deleteButton) {
-      deleteWordByKey(deleteButton.dataset.word);
-      return;
-    }
-    const button = event.target.closest(".learn-toggle");
-    if (button) toggleLearned(button.dataset.word);
-  });
-}
-
-if (groupButtons) {
-  groupButtons.addEventListener("click", (event) => {
-    const chip = event.target.closest(".group-chip");
-    if (!chip) return;
-    selectedGroup = chip.dataset.group || "all";
-    renderGroupButtons();
-    renderList();
-  });
-}
-
-if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
-if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
-if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
-if (editCardButton) editCardButton.addEventListener("click", editCurrentCard);
-if (flashcardDelete) {
-  flashcardDelete.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (!cardWords.length) return;
-    deleteWordByKey(wordKey(cardWords[cardIndex]));
-  });
-}
-if (undoToastButton) {
-  undoToastButton.addEventListener("click", () => {
-    if (undoAction) undoAction();
-    closeUndoToast();
-  });
-}
-if (undoToastClose) undoToastClose.addEventListener("click", closeUndoToast);
-
-if (searchInput) searchInput.addEventListener("input", renderList);
-if (listPriorityFilter) listPriorityFilter.addEventListener("change", renderList);
-if (hideLearned) hideLearned.addEventListener("change", renderList);
-if (cardPriorityFilter) cardPriorityFilter.addEventListener("change", filterCardWords);
-
-const shuffleButton = byId("shuffleButton");
-if (shuffleButton) shuffleButton.addEventListener("click", shuffleCards);
-
-const prevCard = byId("prevCard");
-if (prevCard) prevCard.addEventListener("click", () => moveCard(-1));
-
-const nextCard = byId("nextCard");
-if (nextCard) nextCard.addEventListener("click", () => moveCard(1));
-
-const againButton = byId("againButton");
-if (againButton) againButton.addEventListener("click", () => moveCard(1));
-
-if (learnedButton) {
-  learnedButton.addEventListener("click", () => {
-    if (!cardWords.length) return;
-    toggleLearned(wordKey(cardWords[cardIndex]));
-    moveCard(1);
+function showFatalBanner(error) {
+  const message = (error && error.message) ? error.message : String(error || "Ошибка");
+  const banner = document.createElement("div");
+  banner.style.position = "fixed";
+  banner.style.left = "14px";
+  banner.style.right = "14px";
+  banner.style.top = "14px";
+  banner.style.zIndex = "10000";
+  banner.style.border = "1px solid rgba(185, 28, 28, 0.25)";
+  banner.style.background = "#fff5f5";
+  banner.style.color = "#7f1d1d";
+  banner.style.borderRadius = "14px";
+  banner.style.padding = "12px 12px";
+  banner.style.boxShadow = "0 18px 60px rgba(31,41,51,0.18)";
+  banner.innerHTML = `
+    <div style="font-weight:900;margin-bottom:6px">Сайт сломался из‑за ошибки в данных/кэше</div>
+    <div style="opacity:.9;font-size:13px;margin-bottom:10px">Сообщение: ${escapeHTML(message)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="fixReset" style="border:0;border-radius:999px;padding:10px 14px;font-weight:900;background:#b91c1c;color:#fff;cursor:pointer">Сбросить данные</button>
+      <button id="fixReload" style="border:1px solid rgba(31,41,51,0.18);border-radius:999px;padding:10px 14px;font-weight:900;background:#fff;cursor:pointer">Перезагрузить</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+  banner.querySelector("#fixReload")?.addEventListener("click", () => window.location.reload());
+  banner.querySelector("#fixReset")?.addEventListener("click", () => {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(CUSTOM_WORDS_KEY);
+      window.localStorage.removeItem(EDITED_WORDS_KEY);
+      window.localStorage.removeItem(DELETED_WORDS_KEY);
+    } catch (e) {}
+    window.location.reload();
   });
 }
 
-if (flashcard) {
-  flashcard.addEventListener("click", (event) => {
-    if (event.target.closest(".icon-close")) return;
-    isFlipped = !isFlipped;
-    renderCard();
+function initApp() {
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".tab-button").forEach((item) => item.classList.remove("active"));
+      document.querySelectorAll(".panel").forEach((item) => item.classList.remove("active"));
+      button.classList.add("active");
+      const target = byId(`${button.dataset.view}View`);
+      if (target) target.classList.add("active");
+    });
   });
-  flashcard.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
+
+  if (wordGrid) {
+    wordGrid.addEventListener("click", (event) => {
+      const deleteButton = event.target.closest(".card-delete");
+      if (deleteButton) {
+        deleteWordByKey(deleteButton.dataset.word);
+        return;
+      }
+      const button = event.target.closest(".learn-toggle");
+      if (button) toggleLearned(button.dataset.word);
+    });
+  }
+
+  if (groupButtons) {
+    groupButtons.addEventListener("click", (event) => {
+      const chip = event.target.closest(".group-chip");
+      if (!chip) return;
+      selectedGroup = chip.dataset.group || "all";
+      renderGroupButtons();
+      renderList();
+    });
+  }
+
+  if (toggleAddForm) toggleAddForm.addEventListener("click", () => toggleAddWordPanel());
+  if (cancelAddWord) cancelAddWord.addEventListener("click", () => toggleAddWordPanel(false));
+  if (addWordForm) addWordForm.addEventListener("submit", addCustomWord);
+  if (editCardButton) editCardButton.addEventListener("click", editCurrentCard);
+  if (flashcardDelete) {
+    flashcardDelete.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (!cardWords.length) return;
+      deleteWordByKey(wordKey(cardWords[cardIndex]));
+    });
+  }
+  if (undoToastButton) {
+    undoToastButton.addEventListener("click", () => {
+      if (undoAction) undoAction();
+      closeUndoToast();
+    });
+  }
+  if (undoToastClose) undoToastClose.addEventListener("click", closeUndoToast);
+
+  if (searchInput) searchInput.addEventListener("input", renderList);
+  if (listPriorityFilter) listPriorityFilter.addEventListener("change", renderList);
+  if (hideLearned) hideLearned.addEventListener("change", renderList);
+  if (cardPriorityFilter) cardPriorityFilter.addEventListener("change", filterCardWords);
+
+  const shuffleButton = byId("shuffleButton");
+  if (shuffleButton) shuffleButton.addEventListener("click", shuffleCards);
+  const prevCard = byId("prevCard");
+  if (prevCard) prevCard.addEventListener("click", () => moveCard(-1));
+  const nextCard = byId("nextCard");
+  if (nextCard) nextCard.addEventListener("click", () => moveCard(1));
+  const againButton = byId("againButton");
+  if (againButton) againButton.addEventListener("click", () => moveCard(1));
+
+  if (learnedButton) {
+    learnedButton.addEventListener("click", () => {
+      if (!cardWords.length) return;
+      toggleLearned(wordKey(cardWords[cardIndex]));
+      moveCard(1);
+    });
+  }
+
+  if (flashcard) {
+    flashcard.addEventListener("click", (event) => {
+      if (event.target.closest(".icon-close")) return;
       isFlipped = !isFlipped;
       renderCard();
-    }
+    });
+    flashcard.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        isFlipped = !isFlipped;
+        renderCard();
+      }
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowLeft") moveCard(-1);
+    if (event.key === "ArrowRight") moveCard(1);
   });
+
+  updateStats();
+  renderGroupButtons();
+  renderList();
+  filterCardWords();
 }
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowLeft") moveCard(-1);
-  if (event.key === "ArrowRight") moveCard(1);
-});
-
-updateStats();
-renderGroupButtons();
-renderList();
-filterCardWords();
+try {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initApp);
+  } else {
+    initApp();
+  }
+} catch (error) {
+  showFatalBanner(error);
+}
