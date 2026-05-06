@@ -2245,8 +2245,8 @@ let learned = new Set(loadLearned());
 let customWords = loadCustomWords();
 let editedWords = loadEditedWords();
 let deletedWords = new Set(loadDeletedWords());
-let allWords = buildWords();
-let cardWords = [...allWords];
+let allWords = [];
+let cardWords = [];
 let cardIndex = 0;
 let isFlipped = false;
 let editingTarget = null;
@@ -2350,6 +2350,9 @@ const GROUP_DEFS = [
 ];
 
 let selectedGroup = "all";
+
+allWords = buildWords();
+cardWords = [...allWords];
 
 function recoverCorruptedStateIfNeeded() {
   // If storage got corrupted and hid all base words, restore safe defaults.
