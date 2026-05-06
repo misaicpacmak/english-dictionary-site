@@ -2209,17 +2209,25 @@ function writeStorage(key, value) {
 
 function loadLearned() {
   const saved = readStorage(STORAGE_KEY, []);
-  return Array.isArray(saved) ? saved : [];
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((item) => typeof item === "string" && item.trim());
 }
 
 function loadCustomWords() {
   const saved = readStorage(CUSTOM_WORDS_KEY, []);
   if (!Array.isArray(saved)) return [];
-  return saved.map((item, index) => ({
-    id: item.id || `custom:${index}:${item.word}`,
-    ...item,
-    source: "custom",
-  }));
+  return saved
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => ({
+      id: item.id || `custom:${index}:${item.word || "word"}`,
+      word: typeof item.word === "string" ? item.word : "",
+      meaning: typeof item.meaning === "string" ? item.meaning : "",
+      note: typeof item.note === "string" ? item.note : "",
+      frequency: Math.max(1, Number(item.frequency) || 1),
+      priority: Number(item.priority) || 3,
+      source: "custom",
+    }))
+    .filter((item) => item.word && item.meaning);
 }
 
 function loadEditedWords() {
@@ -2229,7 +2237,8 @@ function loadEditedWords() {
 
 function loadDeletedWords() {
   const saved = readStorage(DELETED_WORDS_KEY, []);
-  return Array.isArray(saved) ? saved : [];
+  if (!Array.isArray(saved)) return [];
+  return saved.filter((item) => typeof item === "string" && item.trim());
 }
 
 let learned = new Set(loadLearned());
@@ -2360,6 +2369,7 @@ function saveDeletedWords() {
 
 function buildWords() {
   const baseWords = WORDS.map((item) => {
+    if (!item || typeof item !== "object") return null;
     const baseKey = item.word;
     return enrichWord({
       ...item,
@@ -2367,7 +2377,7 @@ function buildWords() {
       source: "base",
       baseKey,
     });
-  }).filter((item) => !deletedWords.has(item.baseKey));
+  }).filter((item) => item && item.word && item.meaning && !deletedWords.has(item.baseKey));
 
   const aliveCustomWords = customWords
     .filter((item) => !deletedWords.has(wordKey(item)))
